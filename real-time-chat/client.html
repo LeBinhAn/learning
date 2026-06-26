@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Socket.IO Chat Client</title>
+  <!-- Modern Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Socket.io CDN -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    :root {
+      --bg-color: #0b0f19;
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --success: #10b981;
+      --danger: #ef4444;
+      --accent-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.15) 0px, transparent 50%);
+    }
+
+    .container {
+      width: 90%;
+      max-width: 900px;
+      height: 80vh;
+      display: flex;
+      flex-direction: column;
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+      animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Header styling */
+    header {
+      padding: 24px 32px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(15, 23, 42, 0.3);
+    }
+
+    .brand-section h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: var(--accent-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 4px;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      padding: 6px 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      border-radius: 30px;
+      transition: all 0.3s ease;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--danger);
+      box-shadow: 0 0 10px var(--danger);
+      transition: all 0.3s ease;
+    }
+
+    .status-badge.connected .status-dot {
+      background-color: var(--success);
+      box-shadow: 0 0 10px var(--success);
+    }
+
+    .status-badge.connected {
+      color: var(--text-main);
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+
+    /* Config panel */
+    .config-panel {
+      padding: 16px 32px;
+      background: rgba(15, 23, 42, 0.15);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex-grow: 1;
+      min-width: 150px;
+    }
+
+    .input-group label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    .input-field {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 0.9rem;
+      transition: all 0.3s ease;
+    }
+
+    .input-field:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    }
+
+    .btn {
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 0.9rem;
+      padding: 10px 20px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: var(--accent-gradient);
+      color: white;
+      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Message Area */
+    .chat-area {
+      flex-grow: 1;
+      padding: 32px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      scroll-behavior: smooth;
+    }
+
+    .chat-area::-webkit-scrollbar {
+      width: 6px;
+    }
+    .chat-area::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .chat-area::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+
+    .message {
+      max-width: 75%;
+      padding: 12px 18px;
+      border-radius: 16px;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      animation: messageSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    @keyframes messageSlideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.received {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+    }
+
+    .message.sent {
+      background: var(--accent-gradient);
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
+      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.15);
+    }
+
+    .msg-sender {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .message.received .msg-sender {
+      color: var(--primary);
+    }
+
+    .message.sent .msg-sender {
+      color: rgba(255, 255, 255, 0.85);
+    }
+
+    .msg-time {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      align-self: flex-end;
+      margin-top: 2px;
+    }
+
+    .message.sent .msg-time {
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .system-notification {
+      align-self: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.02);
+      padding: 6px 14px;
+      border-radius: 30px;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    /* Input Footer */
+    footer {
+      padding: 24px 32px;
+      border-top: 1px solid var(--border-color);
+      background: rgba(15, 23, 42, 0.3);
+      display: flex;
+      gap: 16px;
+    }
+
+    footer .input-field {
+      flex-grow: 1;
+      padding: 16px 20px;
+      border-radius: 14px;
+    }
+
+    footer .btn {
+      padding: 0 28px;
+      border-radius: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="brand-section">
+        <h1>Socket.IO Test Client</h1>
+        <p style="font-size: 0.85rem; color: var(--text-muted)">Real-time gateway dashboard</p>
+      </div>
+      <div id="statusBadge" class="status-badge">
+        <div class="status-dot"></div>
+        <span id="statusText">Disconnected</span>
+      </div>
+    </header>
+
+    <div class="config-panel">
+      <div class="input-group" style="flex-grow: 2;">
+        <label for="serverUrl">Server URL</label>
+        <input type="text" id="serverUrl" class="input-field" value="http://localhost:3000" placeholder="e.g., http://localhost:3000">
+      </div>
+      <div class="input-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" class="input-field" value="User_1" placeholder="Enter username">
+      </div>
+      <button id="connectBtn" class="btn btn-primary" style="margin-top: 18px;">Connect</button>
+    </div>
+
+    <div id="chatArea" class="chat-area">
+      <div class="system-notification">Welcome! Click "Connect" to establish a websocket connection.</div>
+    </div>
+
+    <footer>
+      <input type="text" id="messageInput" class="input-field" placeholder="Type your message here..." disabled autocomplete="off">
+      <button id="sendBtn" class="btn btn-primary" disabled>
+        Send
+      </button>
+    </footer>
+  </div>
+
+  <script>
+    let socket = null;
+
+    const serverUrlInput = document.getElementById('serverUrl');
+    const usernameInput = document.getElementById('username');
+    const connectBtn = document.getElementById('connectBtn');
+    const statusBadge = document.getElementById('statusBadge');
+    const statusText = document.getElementById('statusText');
+    const chatArea = document.getElementById('chatArea');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+
+    function appendSystemMsg(text) {
+      const msg = document.createElement('div');
+      msg.className = 'system-notification';
+      msg.innerText = text;
+      chatArea.appendChild(msg);
+      chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    function appendChatMsg(sender, message, isSelf) {
+      const msg = document.createElement('div');
+      msg.className = `message ${isSelf ? 'sent' : 'received'}`;
+      
+      const senderEl = document.createElement('span');
+      senderEl.className = 'msg-sender';
+      senderEl.innerText = sender;
+      
+      const textEl = document.createElement('span');
+      textEl.innerText = message;
+
+      const timeEl = document.createElement('span');
+      timeEl.className = 'msg-time';
+      const now = new Date();
+      timeEl.innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      msg.appendChild(senderEl);
+      msg.appendChild(textEl);
+      msg.appendChild(timeEl);
+
+      chatArea.appendChild(msg);
+      chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    connectBtn.addEventListener('click', () => {
+      if (socket && socket.connected) {
+        // Disconnect
+        socket.disconnect();
+        return;
+      }
+
+      const url = serverUrlInput.value.trim();
+      const username = usernameInput.value.trim() || 'Anonymous';
+
+      if (!url) {
+        alert('Please enter a server URL');
+        return;
+      }
+
+      appendSystemMsg(`Connecting to ${url}...`);
+      
+      // Initialize Socket.io Connection
+      socket = io(url, {
+        transports: ['websocket'],
+      });
+
+      socket.on('connect', () => {
+        statusBadge.classList.add('connected');
+        statusText.innerText = 'Connected';
+        connectBtn.innerText = 'Disconnect';
+        connectBtn.className = 'btn btn-secondary';
+        
+        messageInput.removeAttribute('disabled');
+        sendBtn.removeAttribute('disabled');
+        messageInput.focus();
+        
+        appendSystemMsg(`Connected to server! ID: ${socket.id}`);
+      });
+
+      socket.on('disconnect', (reason) => {
+        statusBadge.classList.remove('connected');
+        statusText.innerText = 'Disconnected';
+        connectBtn.innerText = 'Connect';
+        connectBtn.className = 'btn btn-primary';
+        
+        messageInput.setAttribute('disabled', 'true');
+        sendBtn.setAttribute('disabled', 'true');
+        
+        appendSystemMsg(`Disconnected: ${reason}`);
+      });
+
+      socket.on('connect_error', (error) => {
+        appendSystemMsg(`Connection Error: ${error.message}`);
+      });
+
+      // Listen for custom event 'newMessage' emitted by ChatGateway
+      socket.on('newMessage', (payload) => {
+        const isSelf = payload.sender === username;
+        appendChatMsg(payload.sender, payload.message, isSelf);
+      });
+    });
+
+    function sendMessage() {
+      if (!socket || !socket.connected) return;
+      
+      const message = messageInput.value.trim();
+      if (!message) return;
+
+      const username = usernameInput.value.trim() || 'Anonymous';
+
+      // Emit custom 'sendMessage' event to ChatGateway
+      socket.emit('sendMessage', {
+        sender: username,
+        message: message
+      });
+
+      messageInput.value = '';
+      messageInput.focus();
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        sendMessage();
+      }
+    });
+  </script>
+</body>
+</html>
