@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Socket.IO Chat Client</title>
+  <title>Socket.IO Stateful Chat Client</title>
   <!-- Modern Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -311,8 +311,8 @@
   <div class="container">
     <header>
       <div class="brand-section">
-        <h1>Socket.IO Test Client</h1>
-        <p style="font-size: 0.85rem; color: var(--text-muted)">Real-time gateway dashboard</p>
+        <h1>Socket.IO Chat Client</h1>
+        <p style="font-size: 0.85rem; color: var(--text-muted)">Stateful Server Iteration (V1)</p>
       </div>
       <div id="statusBadge" class="status-badge">
         <div class="status-dot"></div>
@@ -326,14 +326,14 @@
         <input type="text" id="serverUrl" class="input-field" value="http://localhost:3000" placeholder="e.g., http://localhost:3000">
       </div>
       <div class="input-group">
-        <label for="username">Username</label>
-        <input type="text" id="username" class="input-field" value="User_1" placeholder="Enter username">
+        <label for="nickname">Nickname</label>
+        <input type="text" id="nickname" class="input-field" value="User_1" placeholder="Enter nickname">
       </div>
-      <button id="connectBtn" class="btn btn-primary" style="margin-top: 18px;">Connect</button>
+      <button id="connectBtn" class="btn btn-primary" style="margin-top: 18px;">Connect & Join</button>
     </div>
 
     <div id="chatArea" class="chat-area">
-      <div class="system-notification">Welcome! Click "Connect" to establish a websocket connection.</div>
+      <div class="system-notification">Welcome! Enter your nickname and click "Connect & Join" to connect and participate.</div>
     </div>
 
     <footer>
@@ -348,7 +348,7 @@
     let socket = null;
 
     const serverUrlInput = document.getElementById('serverUrl');
-    const usernameInput = document.getElementById('username');
+    const nicknameInput = document.getElementById('nickname');
     const connectBtn = document.getElementById('connectBtn');
     const statusBadge = document.getElementById('statusBadge');
     const statusText = document.getElementById('statusText');
@@ -390,22 +390,25 @@
 
     connectBtn.addEventListener('click', () => {
       if (socket && socket.connected) {
-        // Disconnect
         socket.disconnect();
         return;
       }
 
       const url = serverUrlInput.value.trim();
-      const username = usernameInput.value.trim() || 'Anonymous';
+      const nickname = nicknameInput.value.trim();
 
       if (!url) {
         alert('Please enter a server URL');
         return;
       }
 
+      if (!nickname) {
+        alert('Please enter a nickname');
+        return;
+      }
+
       appendSystemMsg(`Connecting to ${url}...`);
       
-      // Initialize Socket.io Connection
       socket = io(url, {
         transports: ['websocket'],
       });
@@ -413,20 +416,29 @@
       socket.on('connect', () => {
         statusBadge.classList.add('connected');
         statusText.innerText = 'Connected';
-        connectBtn.innerText = 'Disconnect';
-        connectBtn.className = 'btn btn-secondary';
-        
-        messageInput.removeAttribute('disabled');
-        sendBtn.removeAttribute('disabled');
-        messageInput.focus();
-        
-        appendSystemMsg(`Connected to server! ID: ${socket.id}`);
+        appendSystemMsg(`Connected! Sending joinRoom command for "${nickname}"...`);
+
+        // Send JoinRoom command
+        socket.emit('joinRoom', { nickname }, (response) => {
+          if (response && response.success) {
+            appendSystemMsg(`Successfully joined the room as "${response.nickname}"!`);
+            connectBtn.innerText = 'Leave Room';
+            connectBtn.className = 'btn btn-secondary';
+            
+            messageInput.removeAttribute('disabled');
+            sendBtn.removeAttribute('disabled');
+            messageInput.focus();
+          } else {
+            appendSystemMsg(`Failed to join room: ${response ? response.error : 'Unknown error'}`);
+            socket.disconnect();
+          }
+        });
       });
 
       socket.on('disconnect', (reason) => {
         statusBadge.classList.remove('connected');
         statusText.innerText = 'Disconnected';
-        connectBtn.innerText = 'Connect';
+        connectBtn.innerText = 'Connect & Join';
         connectBtn.className = 'btn btn-primary';
         
         messageInput.setAttribute('disabled', 'true');
@@ -439,9 +451,20 @@
         appendSystemMsg(`Connection Error: ${error.message}`);
       });
 
-      // Listen for custom event 'newMessage' emitted by ChatGateway
+      socket.on('exception', (error) => {
+        appendSystemMsg(`⚠️ Server Error: ${error.message || JSON.stringify(error)}`);
+      });
+
+      socket.on('participantJoined', (data) => {
+        appendSystemMsg(`👋 ${data.nickname} joined the room`);
+      });
+
+      socket.on('participantLeft', (data) => {
+        appendSystemMsg(`🚪 ${data.nickname} left the room`);
+      });
+
       socket.on('newMessage', (payload) => {
-        const isSelf = payload.sender === username;
+        const isSelf = payload.sender === nicknameInput.value.trim();
         appendChatMsg(payload.sender, payload.message, isSelf);
       });
     });
@@ -452,11 +475,7 @@
       const message = messageInput.value.trim();
       if (!message) return;
 
-      const username = usernameInput.value.trim() || 'Anonymous';
-
-      // Emit custom 'sendMessage' event to ChatGateway
       socket.emit('sendMessage', {
-        sender: username,
         message: message
       });
 
